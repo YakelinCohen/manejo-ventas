@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Producto,Categoria,Estante,Nivel
+from .models import Lote, Producto,Categoria,Estante,Nivel
 
 class ProductoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,4 +19,9 @@ class EstanteSerializer(serializers.ModelSerializer):
 class NivelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Nivel
+        fields = '__all__'
+
+class LoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Lote
         fields = '__all__'

@@ -46,12 +46,38 @@ class Nivel(models.Model):
         db_table = 'in_nivel'
         unique_together = ('numero', 'estante')
 
-# Create your models here.
+#Los lotes se deben ingresar en el estantes por orden de vencimiento, el primero en vencer debe ser el primero en salir
+class Lote(models.Model):
+    id_lote = models.AutoField(primary_key=True)
+    codigo = models.CharField(max_length=100)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+    fecha_expedicion  = models.DateField()
+    fecha_vencimiento = models.DateField() 
+    cantidad_disponible = models.IntegerField()
+    producto = models.ForeignKey('Producto', on_delete=models.DO_NOTHING)
+
+    def __str__(self):
+        return f"{self.producto.nombre} - Lote: {self.codigo}"
+
+    class Meta:
+        db_table = 'in_lote'
+        unique_together = ('producto', 'codigo', 'fecha_vencimiento')
+
+class CodigoBarras(models.Model):
+    id_codigo = models.AutoField(primary_key=True)
+    codigo = models.CharField(max_length=100, unique=True) 
+
+    def __str__(self):
+        return f"{self.codigo} - Producto: {self.producto.descripcion}"
+
+    class Meta:
+        db_table = 'in_codigo_barras'
+
 class Producto(models.Model):
     id_producto = models.AutoField(primary_key=True) 
     descripcion = models.CharField(max_length=255)
-    precio = models.DecimalField(max_digits=10, decimal_places=2)
-    unidades_totales  = models.IntegerField()
+    precio = models.DecimalField(max_digits=10, decimal_places=2) 
     unidades_en_exhibicion = models.IntegerField(default=0)
     cantidad_max_exhibicion = models.IntegerField(default=1)
     cantidad_min_exhibicion = models.IntegerField(default=1)
@@ -59,15 +85,21 @@ class Producto(models.Model):
     fecha_actualizacion = models.DateTimeField(auto_now=True)
     categoria = models.ForeignKey('Categoria', on_delete=models.PROTECT, null=True)
     nivel = models.ForeignKey('Nivel', on_delete=models.PROTECT, related_name='ubicacion', null=True) 
+    codigo_barras = models.OneToOneField('CodigoBarras', on_delete=models.PROTECT, null=True)
+
+    @property
+    def unidades_totales(self):
+        # Ahora el total es SIEMPRE la suma de tus lotes
+        return self.lotes.aggregate(total=models.Sum('cantidad'))['total'] or 0
 
     @property
     def unidades_en_bodega(self):
-        # El resto siempre está en el almacén
+        # Calculado: Total de lotes menos lo que ya sacaste a exhibición
         return self.unidades_totales - self.unidades_en_exhibicion
 
     @property
     def necesita_reposicion(self):
-        # Si lo que hay en exhibición es menor o igual al mínimo
+        # Lógica de estante: ¿hay que traer más de la bodega?
         return self.unidades_en_exhibicion <= self.cantidad_min_exhibicion
 
     def __str__(self):
