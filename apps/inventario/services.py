@@ -1,7 +1,7 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from datetime import date
-from apps.inventario.models import Producto, Lote, CodigoBarras
+from apps.inventario.models import EntradaMercancia, Producto, Lote, CodigoBarras
 
 class ProductoService:
     """
@@ -18,6 +18,20 @@ class ProductoService:
         for lote in lotes_data:
             if lote['fecha_vencimiento'] < hoy:
                 raise ValidationError(f"El lote {lote['codigo']} ya está vencido.")
+
+    @staticmethod
+    def registrar_entrada(producto, cantidad):
+        """
+        Registra una entrada de mercancía de forma segura.
+        Busca automáticamente un código de barras asociado para vincular la entrada.
+        """
+        if cantidad <= 0:
+            return
+
+        # Usamos filter().first() para evitar errores si hay 0 o múltiples códigos
+        codigo_barras = CodigoBarras.objects.filter(producto=producto).first()
+        if codigo_barras:
+            EntradaMercancia.objects.create(unidades=cantidad, CodigoBarras=codigo_barras)
 
     @classmethod
     @transaction.atomic
@@ -39,6 +53,12 @@ class ProductoService:
                 for c in codigos_data
             ]
             CodigoBarras.objects.bulk_create(codigos_objs)
+
+        # Registrar entrada inicial (suma stock base + stock de lotes si existen)
+        # total_unidades = data.get('unidades_stock', 0)
+        if lotes_data:
+            total_unidades = sum(l['cantidad_disponible'] for l in lotes_data)
+        cls.registrar_entrada(producto, total_unidades)
 
         # 5. Optimización: BULK CREATE para Lotes
         if lotes_data:

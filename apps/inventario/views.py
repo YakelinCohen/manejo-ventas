@@ -53,7 +53,6 @@ class Productos(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-
 class CategoriaProductos(APIView):
     def get(self, request, categoria_id):
         productos = Producto.objects.filter(id_categoria_id=categoria_id)

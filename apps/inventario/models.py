@@ -67,7 +67,13 @@ class Lote(models.Model):
 
 class CodigoBarras(models.Model):
     id_codigo = models.AutoField(primary_key=True)
-    codigo = models.CharField(max_length=100, unique=True) 
+    codigo = models.CharField(
+        max_length=50, 
+        blank=True, 
+        null=True, 
+        unique=True,
+        help_text="Escanea el código de barras aquí"
+    )
     producto = models.ForeignKey('Producto', on_delete=models.DO_NOTHING)
 
     def __str__(self):
@@ -75,6 +81,15 @@ class CodigoBarras(models.Model):
 
     class Meta:
         db_table = 'in_codigo_barras'
+
+class EntradaMercancia(models.Model):
+    id_entrada_mercancia = models.AutoField(primary_key=True)
+    unidades = models.IntegerField()
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    CodigoBarras = models.ForeignKey('CodigoBarras', on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = "in_entrada_mercancia"
 
 class Producto(models.Model):
     id_producto = models.AutoField(primary_key=True) 

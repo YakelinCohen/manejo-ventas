@@ -14,12 +14,12 @@ class ProductoCreateSerializer(serializers.ModelSerializer):
         codigo = serializers.CharField(max_length=100)
         fecha_expedicion = serializers.DateField()
         fecha_vencimiento = serializers.DateField()
-        cantidad_disponible = serializers.IntegerField()
+        cantidad_disponible = serializers.IntegerField() 
 
     # Renombramos para coincidir con los argumentos del Manager (codigos_barras_data, lotes_data)
     # Usamos source='...' para leer la relación inversa desde el modelo al responder
     codigos_barras_data = CodigoBarrasSerializer(many=True, source='codigobarras_set')
-    lotes_data = LoteSerializer(many=True, required=False, source='lote_set')
+    lotes_data = LoteSerializer(many=True, required=False, source='lote_set') 
     
     class Meta:
         model = Producto
