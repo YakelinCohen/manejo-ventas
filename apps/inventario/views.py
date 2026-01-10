@@ -1,7 +1,11 @@
 from datetime import date, timedelta
+from urllib import request
+from django.forms import ValidationError
+from apps.inventario.services import ProductoService
 from apps.utils.decorators import validar_payload
-from .models import Estante, Lote, Producto,Categoria
-from .serializers import EstanteSerializer, LoteSerializer, ProductoSerializer, CategoriaSerializer
+from apps.inventario.models import Estante, Lote, Producto,Categoria
+from apps.inventario.serializers import EstanteSerializer, LoteSerializer, ProductoSerializer, CategoriaSerializer,ProductoCreateSerializer
+from apps.inventario.services import ProductoService
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -31,11 +35,23 @@ class Productos(APIView):
     @validar_payload 
     def post(self, request):
         '''Crear un nuevo producto'''
-        serializer = ProductoSerializer(data=request.data.get('payload'))
-        if serializer.is_valid():
-            serializer.save()
+        
+        try:
+            # Usamos el manager para crear el producto con toda la lógica de negocio
+            payload = request.data.get("payload")
+            validador = ProductoCreateSerializer(data=payload)
+            validador.is_valid(raise_exception=True)
+
+            producto = ProductoService.crear_producto_completo(**validador.validated_data) 
+
+            # 5. Serializar respuesta
+            serializer = ProductoCreateSerializer(producto)
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except ValidationError as e:
+            return Response({'error': e.messages}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CategoriaProductos(APIView):
@@ -76,7 +92,7 @@ class AlertaVencimiento(APIView):
             "payload": serializer.data
         })
     
-class Lote(APIView):
+class Lotes(APIView):
     def get(self, request):
         lotes = Lote.objects.all()
         serializer = LoteSerializer(lotes, many=True)
@@ -103,13 +119,4 @@ class Lote(APIView):
             serializer.save()
             return Response(serializer.data)
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    @validar_payload
-    def post(self, request):
-        '''Crear un nuevo lote'''
-        serializer = LoteSerializer(data=request.data.get('payload'))
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

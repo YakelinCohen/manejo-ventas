@@ -1,3 +1,3 @@
 "# manejo-ventas" 
 
-#Hola mi primer Readme
+#Hola mi primer Readmegit 

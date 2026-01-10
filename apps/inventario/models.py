@@ -1,4 +1,5 @@
 from django.db import models 
+from .managers import ProductoManager
 
 class Categoria(models.Model):
     id_categoria = models.AutoField(primary_key=True)
@@ -67,6 +68,7 @@ class Lote(models.Model):
 class CodigoBarras(models.Model):
     id_codigo = models.AutoField(primary_key=True)
     codigo = models.CharField(max_length=100, unique=True) 
+    producto = models.ForeignKey('Producto', on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return f"{self.codigo} - Producto: {self.producto.descripcion}"
@@ -76,21 +78,30 @@ class CodigoBarras(models.Model):
 
 class Producto(models.Model):
     id_producto = models.AutoField(primary_key=True) 
-    descripcion = models.CharField(max_length=255)
+    descripcion = models.CharField(
+        max_length=255, 
+        unique=True, 
+        verbose_name="Descripción del Producto"
+    )
     precio = models.DecimalField(max_digits=10, decimal_places=2) 
+    unidades_stock = models.IntegerField(default=0, help_text="Total de unidades (usado cuando no requiere lotes)")
     unidades_en_exhibicion = models.IntegerField(default=0)
     cantidad_max_exhibicion = models.IntegerField(default=1)
     cantidad_min_exhibicion = models.IntegerField(default=1)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
+    requiere_lotes = models.BooleanField(default=True)
     categoria = models.ForeignKey('Categoria', on_delete=models.PROTECT, null=True)
-    nivel = models.ForeignKey('Nivel', on_delete=models.PROTECT, related_name='ubicacion', null=True) 
-    codigo_barras = models.OneToOneField('CodigoBarras', on_delete=models.PROTECT, null=True)
+    nivel = models.ForeignKey('Nivel', on_delete=models.PROTECT, related_name='ubicacion', null=True)  
+
+    objects = ProductoManager()
 
     @property
     def unidades_totales(self):
-        # Ahora el total es SIEMPRE la suma de tus lotes
-        return self.lotes.aggregate(total=models.Sum('cantidad'))['total'] or 0
+        if not self.requiere_lotes:
+            return self.unidades_stock
+        # Si requiere lotes, suma de lotes
+        return self.lotes.aggregate(total=models.Sum('cantidad_disponible'))['total'] or 0
 
     @property
     def unidades_en_bodega(self):
