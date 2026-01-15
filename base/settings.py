@@ -53,7 +53,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',      # Para la API
     'corsheaders',         # Para permitir que Vue se conecte
-    'apps.inventario',           # Tu futura app de inventario (la crearemos luego)
+    'apps.inventario',         
+    'apps.ventas',    
+    'apps.configuracion'         
 ]
 
 MIDDLEWARE = [
