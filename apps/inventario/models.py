@@ -1,5 +1,6 @@
 from django.db import models 
 from .managers import ProductoManager
+from apps.configuracion.models import TasaCambio
 
 class Categoria(models.Model):
     id_categoria = models.AutoField(primary_key=True)
@@ -127,6 +128,13 @@ class Producto(models.Model):
     def necesita_reposicion(self):
         # Lógica de estante: ¿hay que traer más de la bodega?
         return self.unidades_en_exhibicion <= self.cantidad_min_exhibicion
+
+    @property
+    def precio_en_bolivares(self):
+        tasa = TasaCambio.objects.filter(moneda='USD').first()
+        if tasa:
+            return self.precio * tasa.monto
+        return 0
 
     def __str__(self):
         return self.descripcion

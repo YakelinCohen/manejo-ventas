@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.ventas.models import Cliente, Venta, DetalleVenta
+from apps.ventas.models import Cliente, Venta, DetalleVenta,MetodoPago
 from apps.inventario.models import Producto
 
 class ClienteSerializer(serializers.ModelSerializer):
@@ -30,3 +30,8 @@ class VentaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Venta
         fields = ['id_venta', 'fecha_venta', 'total', 'cliente', 'observacion', 'detalles_venta']
+
+class MetodoPagoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MetodoPago
+        fields = '__all__'

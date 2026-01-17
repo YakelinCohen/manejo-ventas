@@ -42,8 +42,7 @@ class Venta(models.Model):
 
 class MetodoPago(models.Model):
     id_metodo_pago = models.AutoField(primary_key=True)
-    nombre = models.CharField(max_length=100, unique=True, null=False)
-    descripcion = models.TextField(blank=True, null=True)
+    nombre = models.CharField(max_length=255, unique=True, null=False) 
 
     def __str__(self):
         return self.nombre
@@ -71,3 +70,6 @@ class DetalleVenta(models.Model):
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
     venta = models.ForeignKey('Venta', on_delete=models.DO_NOTHING)
     producto = models.ForeignKey('inventario.Producto', on_delete=models.DO_NOTHING)    
+
+    class Meta:
+        db_table = 've_detalle_venta'   
