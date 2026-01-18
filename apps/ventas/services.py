@@ -1,26 +1,30 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
-from apps.ventas.models import Venta, DetalleVenta
+from apps.ventas.models import Venta, DetalleVenta, EstadoVenta, PagoVenta, MetodoPago
 from apps.inventario.models import Producto, Lote
+from apps.configuracion.models import Moneda
 
 class VentaService:
     
     @classmethod
     @transaction.atomic
-    def crear_venta(cls, cliente, detalles_data, observacion=None):
+    def crear_venta(cls, cliente, detalles_data, pagos_data, observacion=None):
         """
         Crea una venta completa, calculando totales y descontando stock
         priorizando lotes por vencer.
         
         :param cliente: Instancia de Cliente
         :param detalles_data: Lista de diccionarios [{'producto_id': 1, 'cantidad': 5}, ...]
+        :param pagos_data: Lista [{'metodo_pago_id': 1, 'monto': 100, 'moneda_id': 1}, ...]
         :param observacion: Texto opcional
         """
         total_venta = 0
+        estado_inicial = EstadoVenta.objects.get(id_estado_venta=3) 
         venta = Venta.objects.create(
             cliente=cliente,
-            total=0, # Se actualiza al final
-            observacion=observacion
+            total=0.00, # Se actualiza al final
+            observacion=observacion,
+            estado=estado_inicial
         )
 
         for item in detalles_data:
@@ -50,7 +54,33 @@ class VentaService:
         # Actualizar total de la venta cabecera
         venta.total = total_venta
         venta.save()
+
+        # 2. Registrar Pagos
+        total_pagado = 0
+        for pago in pagos_data:
+            metodo = MetodoPago.objects.get(pk=pago['metodo_pago_id'])
+            moneda = Moneda.objects.get(pk=pago['moneda_id'])
+            monto = float(pago['monto'])
+            
+            PagoVenta.objects.create(
+                venta=venta,
+                monto=monto,
+                metodo_pago=metodo,
+                moneda=moneda
+            )
+            total_pagado += monto
+            
+        # Opcional: Validar que el pago cubra el total
+        # Opcional: Validar que el pago cubra el total
+        # Asegúrate de usar los IDs correctos para tus estados
+        if total_pagado < total_venta:
+            # Estado Pendiente/Incompleto
+             venta.estado = EstadoVenta.objects.get(pk=1) 
+        else:
+            # Estado Pagado/Completo
+            venta.estado = EstadoVenta.objects.get(pk=2)
         
+        venta.save()
         return venta
 
     @staticmethod

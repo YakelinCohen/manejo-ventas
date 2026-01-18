@@ -31,6 +31,7 @@ class Venta(models.Model):
     total = models.DecimalField(max_digits=10, decimal_places=2)
     cliente = models.ForeignKey('Cliente', on_delete=models.DO_NOTHING)
     observacion = models.CharField(max_length=255, blank=True, null=True)
+    estado = models.ForeignKey('EstadoVenta', on_delete=models.DO_NOTHING)
 
     objects = VentaManager()
 
@@ -63,6 +64,16 @@ class PagoVenta(models.Model):
 
     class Meta:
         db_table = 've_pago_venta'
+
+class EstadoVenta(models.Model):
+    id_estado_venta = models.AutoField(primary_key=True)
+    nombre = models.CharField(max_length=255, unique=True, null=False) 
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        db_table = 've_estado_venta'    
 
 class DetalleVenta(models.Model):
     id_detalle_venta = models.AutoField(primary_key=True)

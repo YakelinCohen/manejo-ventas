@@ -21,9 +21,9 @@ def validar_payload(f):
                 status=status.HTTP_400_BAD_REQUEST
             )
             
-        if not isinstance(payload, dict):
+        if not isinstance(payload, (dict, list)):
             return Response(
-                {'error': 'El campo "payload" debe ser un objeto JSON'},
+                {'error': 'El campo "payload" debe ser un objeto JSON o una lista'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         return f(self, request, *args, **kwargs)

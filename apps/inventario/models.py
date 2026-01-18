@@ -1,6 +1,7 @@
 from django.db import models 
 from .managers import ProductoManager
 from apps.configuracion.models import TasaCambio
+from django.utils import timezone
 
 class Categoria(models.Model):
     id_categoria = models.AutoField(primary_key=True)
