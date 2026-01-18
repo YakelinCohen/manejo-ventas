@@ -83,6 +83,51 @@ class VentaService:
         venta.save()
         return venta
 
+    @classmethod
+    @transaction.atomic
+    def registrar_pago(cls, venta_id, pagos_data, observacion=None):
+        """
+        Registra un nuevo pago a una venta existente.
+        Actualiza el estado de la venta si se completa el pago.
+        """
+        try:
+            venta = Venta.objects.select_for_update().get(pk=venta_id)
+        except Venta.DoesNotExist:
+             raise ValidationError(f"La venta con ID {venta_id} no existe.")
+
+        # Registrar nuevos pagos
+        total_nuevo_pago = 0
+        for pago in pagos_data:
+            metodo = MetodoPago.objects.get(pk=pago['metodo_pago_id'])
+            moneda = Moneda.objects.get(pk=pago['moneda_id'])
+            monto = float(pago['monto'])
+            
+            PagoVenta.objects.create(
+                venta=venta,
+                monto=monto,
+                metodo_pago=metodo,
+                moneda=moneda
+            )
+            total_nuevo_pago += monto
+
+        # Calcular TOTAL pagado histórico (lo que ya tenía + lo nuevo)
+        # Sumamos todos los pagos asociados a esta venta
+        total_acumulado = sum(p.monto for p in venta.pagoventa_set.all())
+        
+        # Verificar si se cubrió el total
+        # ID 2 = Completada/Pagada, ID 1 = Pendiente
+        if total_acumulado >= venta.total:
+            if venta.estado.id_estado_venta != 2:
+                venta.estado = EstadoVenta.objects.get(pk=2)
+                venta.save()
+        else:
+            # Si por alguna razón estaba en completada y se recalculó mal (caso raro), o sigue pendiente
+            if venta.estado.id_estado_venta != 1:
+                venta.estado = EstadoVenta.objects.get(pk=1)
+                venta.save()
+                
+        return venta
+
     @staticmethod
     def _descontar_stock(producto, cantidad_a_descontar):
         """

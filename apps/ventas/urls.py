@@ -1,5 +1,5 @@
 from django.urls import path
-from apps.ventas.views import VentaView, ClienteView, MetodoPagoView, EstadoVentaView
+from apps.ventas.views import VentaView, ClienteView, MetodoPagoView, EstadoVentaView, PagoVentaView
 urlpatterns = [
     path('ventas/', VentaView.as_view(), name='ventas'), 
     path('ventas/<int:id>/', VentaView.as_view(), name='venta-detalle'),
@@ -13,5 +13,8 @@ urlpatterns = [
     path('estados-venta/', EstadoVentaView.as_view(), name='estados-venta'),
     path('estados-venta/<int:id>/', EstadoVentaView.as_view(), name='estado-venta-detalle'),
     path('estados-venta/crear/', EstadoVentaView.as_view(), name='crear-estado-venta'),
+    path('pagos-venta/', PagoVentaView.as_view(), name='pagos-venta'),
+    path('pagos-venta/<int:id>/', PagoVentaView.as_view(), name='pago-venta-detalle'),
+    path('pagos-venta/agregar/', PagoVentaView.as_view(), name='agregar-pago-venta'),
 
 ]

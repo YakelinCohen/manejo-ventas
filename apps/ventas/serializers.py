@@ -59,3 +59,11 @@ class EstadoVentaSerializer(serializers.ModelSerializer):
     class Meta:
         model = EstadoVenta
         fields = '__all__'
+
+class PagoVentaSerializer(serializers.ModelSerializer):
+    venta = serializers.IntegerField()
+    metodo_pago = serializers.IntegerField()
+    moneda = serializers.IntegerField() 
+    class Meta:
+        model = PagoVenta
+        fields = ['id_pago_venta', 'venta', 'monto', 'metodo_pago', 'moneda']
