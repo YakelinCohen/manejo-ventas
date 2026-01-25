@@ -91,40 +91,57 @@ class VentaService:
         Actualiza el estado de la venta si se completa el pago.
         """
         try:
+        # 1. Bloqueo de fila para evitar condiciones de carrera
             venta = Venta.objects.select_for_update().get(pk=venta_id)
+            if not venta.tiene_pago_pendiente:
+                raise ValidationError(f"La venta {venta_id} ya está pagada.")
         except Venta.DoesNotExist:
-             raise ValidationError(f"La venta con ID {venta_id} no existe.")
+            raise ValidationError(f"La venta {venta_id} no existe.")
 
-        # Registrar nuevos pagos
-        total_nuevo_pago = 0
-        for pago in pagos_data:
-            metodo = MetodoPago.objects.get(pk=pago['metodo_pago_id'])
-            moneda = Moneda.objects.get(pk=pago['moneda_id'])
-            monto = float(pago['monto'])
-            
-            PagoVenta.objects.create(
-                venta=venta,
-                monto=monto,
-                metodo_pago=metodo,
-                moneda=moneda
-            )
-            total_nuevo_pago += monto
+    # 2. VALIDACIÓN DE MÉTODOS Y MONEDAS (Evita el bucle N+1)
+    metodo_ids = [dato_pago['metodo_pago_id'] for dato_pago in pagos_data]
+    moneda_ids = [dato_pago['moneda_id'] for dato_pago in pagos_data]
+    
+    # Verificamos cuántos existen de los solicitados
+    metodos_existentes = MetodoPago.objects.filter(id__in=metodo_ids)
+    monedas_existentes = Moneda.objects.filter(id__in=moneda_ids)
 
-        # Calcular TOTAL pagado histórico (lo que ya tenía + lo nuevo)
-        # Sumamos todos los pagos asociados a esta venta
-        total_acumulado = sum(p.monto for p in venta.pagoventa_set.all())
-        
-        # Verificar si se cubrió el total
-        # ID 2 = Completada/Pagada, ID 1 = Pendiente
-        if total_acumulado >= venta.total:
-            if venta.estado.id_estado_venta != 2:
-                venta.estado = EstadoVenta.objects.get(pk=2)
-                venta.save()
-        else:
-            # Si por alguna razón estaba en completada y se recalculó mal (caso raro), o sigue pendiente
-            if venta.estado.id_estado_venta != 1:
-                venta.estado = EstadoVenta.objects.get(pk=1)
-                venta.save()
+    if metodos_existentes.count() != len(set(metodo_ids)):
+        raise ValidationError("Uno o más métodos de pago no son válidos.")
+    
+    if monedas_existentes.count() != len(set(moneda_ids)):
+        raise ValidationError("Uno o más tipos de moneda no son válidos.")
+
+    # Convertimos a diccionarios para acceso rápido
+    dict_metodos = {metodo.id: metodo for metodo in metodos_existentes}
+    dict_monedas = {moneda.id: moneda for moneda in monedas_existentes}
+
+    # 3. REGISTRO DE PAGOS (Bulk Create es opcional aquí, pero útil)
+    pagos_a_crear = []
+    for pago in pagos_data:
+        pagos_a_crear.append(PagoVenta(
+            venta=venta,
+            monto=Decimal(str(pago['monto'])), # Usar Decimal siempre
+            metodo_pago=dict_metodos[pago['metodo_pago_id']],
+            moneda=dict_monedas[pago['moneda_id']]
+        ))
+    
+    PagoVenta.objects.bulk_create(pagos_a_crear)
+
+    # 4. CÁLCULO OPTIMIZADO DEL TOTAL
+    # Dejamos que la base de datos haga la suma, es mucho más rápido
+    resultado = venta.pagoventa_set.aggregate(total_acumulado=Sum('monto'))
+    total_acumulado = resultado['total_acumulado'] or Decimal('0.00')
+
+    # 5. ACTUALIZACIÓN DE ESTADO (Usando constantes o IDs fijos)
+    ID_PAGADA = 2
+    ID_PENDIENTE = 1
+    
+    nuevo_estado_id = ID_PAGADA if total_acumulado >= venta.total else ID_PENDIENTE
+    
+    if venta.estado_id != nuevo_estado_id:
+        venta.estado_id = nuevo_estado_id
+        venta.save(update_fields=['estado']) # Solo actualizamos el campo estado por eficiencia
                 
         return venta
 

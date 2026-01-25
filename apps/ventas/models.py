@@ -37,9 +37,14 @@ class Venta(models.Model):
 
     def __str__(self):
         return f'Venta {self.id_venta} - Cliente: {self.cliente.nombre} - Total: {self.total}'
+        
+    @property
+    def tiene_pago_pendiente(self):
+        # Esto funciona como tu booleano, pero es automático
+        return self.estado.id_estado_venta == 1
 
     class Meta:
-        db_table = 've_venta'
+            db_table = 've_venta'
 
 class MetodoPago(models.Model):
     id_metodo_pago = models.AutoField(primary_key=True)
