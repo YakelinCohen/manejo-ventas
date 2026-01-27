@@ -112,6 +112,9 @@ class VentaService:
     if monedas_existentes.count() != len(set(moneda_ids)):
         raise ValidationError("Uno o más tipos de moneda no son válidos.")
 
+    tasa_obj = TasaCambio.objects.filter(moneda='USD').first()
+    tasa_valor = tasa_obj.monto if tasa_obj else Decimal('1.00')
+
     # Convertimos a diccionarios para acceso rápido
     dict_metodos = {metodo.id: metodo for metodo in metodos_existentes}
     dict_monedas = {moneda.id: moneda for moneda in monedas_existentes}
@@ -119,9 +122,22 @@ class VentaService:
     # 3. REGISTRO DE PAGOS (Bulk Create es opcional aquí, pero útil)
     pagos_a_crear = []
     for pago in pagos_data:
+        monto_original = Decimal(str(pago['monto']))
+        moneda = dict_monedas.get(pago['moneda_id'])
+        
+        if not moneda:
+            raise ValidationError(f"Moneda ID {pago['moneda_id']} no válida.")
+
+        # LÓGICA DE CONVERSIÓN:
+        # Si el pago es en Bs (suponiendo que 'VES' es el código), convertimos a USD
+        if moneda.codigo == 'VES':
+            monto_en_usd = monto_original / tasa_valor
+        else:
+            monto_en_usd = monto_original
+        
         pagos_a_crear.append(PagoVenta(
             venta=venta,
-            monto=Decimal(str(pago['monto'])), # Usar Decimal siempre
+            monto=monto_en_usd,
             metodo_pago=dict_metodos[pago['metodo_pago_id']],
             moneda=dict_monedas[pago['moneda_id']]
         ))
@@ -137,8 +153,12 @@ class VentaService:
     ID_PAGADA = 2
     ID_PENDIENTE = 1
     
-    nuevo_estado_id = ID_PAGADA if total_acumulado >= venta.total else ID_PENDIENTE
-    
+    # Margen de error pequeño por decimales (0.01)
+    if total_acumulado >= (venta.total - Decimal('0.01')):
+        nuevo_estado_id = ID_PAGADA
+    else:
+        nuevo_estado_id = ID_PENDIENTE
+         
     if venta.estado_id != nuevo_estado_id:
         venta.estado_id = nuevo_estado_id
         venta.save(update_fields=['estado']) # Solo actualizamos el campo estado por eficiencia
