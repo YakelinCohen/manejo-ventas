@@ -1,5 +1,5 @@
 from apps.ventas.serializers import VentaCreateSerializer
-from apps.ventas.models import Cliente, EstadoVenta, MetodoPago
+from apps.ventas.models import Cliente, EstadoPago, MetodoPago
 from apps.configuracion.models import Moneda
 from apps.inventario.models import Producto
 
@@ -9,7 +9,7 @@ try:
     producto, _ = Producto.objects.get_or_create(id_producto=1, defaults={'descripcion': 'Prod 1', 'precio': 100, 'unidades_stock': 100, 'costo': 50})
     moneda, _ = Moneda.objects.get_or_create(pk=1, defaults={'codigo': 'USD', 'nombre': 'Dolar'})
     metodo, _ = MetodoPago.objects.get_or_create(pk=1, defaults={'nombre': 'Efectivo'})
-    EstadoVenta.objects.get_or_create(pk=3, defaults={'nombre': 'Completada'})
+    EstadoPago.objects.get_or_create(pk=3, defaults={'nombre': 'Completada'})
     
     # Update stock for test
     producto.unidades_stock = 100

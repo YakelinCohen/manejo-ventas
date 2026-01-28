@@ -31,7 +31,7 @@ class Venta(models.Model):
     total = models.DecimalField(max_digits=10, decimal_places=2)
     cliente = models.ForeignKey('Cliente', on_delete=models.DO_NOTHING)
     observacion = models.CharField(max_length=255, blank=True, null=True)
-    estado = models.ForeignKey('EstadoVenta', on_delete=models.DO_NOTHING)
+    estado = models.ForeignKey('EstadoPago', on_delete=models.DO_NOTHING)
 
     objects = VentaManager()
 
@@ -41,7 +41,7 @@ class Venta(models.Model):
     @property
     def tiene_pago_pendiente(self):
         # Esto funciona como tu booleano, pero es automático
-        return self.estado.id_estado_venta == 1
+        return self.estado.id_estado_pago == 1
 
     class Meta:
             db_table = 've_venta'
@@ -70,15 +70,15 @@ class PagoVenta(models.Model):
     class Meta:
         db_table = 've_pago_venta'
 
-class EstadoVenta(models.Model):
-    id_estado_venta = models.AutoField(primary_key=True)
+class EstadoPago(models.Model):
+    id_estado_pago = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=255, unique=True, null=False) 
 
     def __str__(self):
         return self.nombre
 
     class Meta:
-        db_table = 've_estado_venta'    
+        db_table = 've_estado_pago'    
 
 class DetalleVenta(models.Model):
     id_detalle_venta = models.AutoField(primary_key=True)
@@ -89,3 +89,69 @@ class DetalleVenta(models.Model):
 
     class Meta:
         db_table = 've_detalle_venta'   
+
+
+class RecargoProducto(models.Model):
+    # Relación uno a uno: un producto tiene una configuración de recargo (o ninguna)
+    producto = models.OneToOneField(
+        'inventario.Producto', 
+        on_delete=models.DO_NOTHING, 
+        related_name='configuracion_recargo'
+    ) 
+    monto_fijo = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    
+    activo = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Recargo para {self.producto.nombre}"
+
+    class Meta:
+        db_table = 've_recargo_producto'    
+
+
+class Credito(models.Model):
+    id_credito = models.AutoField(primary_key=True)
+    cliente = models.ForeignKey('Cliente', on_delete=models.DO_NOTHING)
+    fecha_credito = models.DateTimeField(auto_now_add=True)
+    total = models.DecimalField(max_digits=10, decimal_places=2) 
+    estado = models.ForeignKey('EstadoPago', on_delete=models.DO_NOTHING)
+    observacion = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f'Credito {self.id_credito} - Cliente: {self.cliente.nombre} - Total: {self.total}'
+
+    class Meta:
+        db_table = 've_credito'
+
+class DetalleCredito(models.Model):
+    credito = models.ForeignKey(Credito, related_name='items', on_delete=models.CASCADE)
+    producto = models.ForeignKey('inventario.Producto', on_delete=models.PROTECT)
+    cantidad = models.PositiveIntegerField()
+    precio_base = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    # Estos campos se llenan automáticamente al crear el registro
+    recargo_aplicado = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def save(self, *args, **kwargs):
+        # Lógica automática: Buscar si el producto tiene recargo configurado
+        try:
+            config = self.producto.configuracion_recargo
+            if config.activo:
+                # Calculamos el recargo (priorizando porcentaje si existe)
+                if config.porcentaje > 0:
+                    self.recargo_aplicado = self.precio_base * (config.porcentaje / 100)
+                else:
+                    self.recargo_aplicado = config.monto_fijo
+        except Producto.configuracion_recargo.RelatedObjectDoesNotExist:
+            # Si no existe en la tabla intermedia, el recargo queda en 0
+            self.recargo_aplicado = 0
+            
+        self.subtotal = (self.precio_base + self.recargo_aplicado) * self.cantidad
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.cantidad} x {self.producto.nombre} - Subtotal: {self.subtotal}'
+
+    class Meta:
+        db_table = 've_detalle_credito'

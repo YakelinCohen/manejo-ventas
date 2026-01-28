@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
-from apps.ventas.models import Venta, DetalleVenta, EstadoVenta, PagoVenta, MetodoPago
+from apps.ventas.models import Venta, DetalleVenta,EstadoPago, PagoVenta, MetodoPago
 from apps.inventario.models import Producto, Lote
 from apps.configuracion.models import Moneda
 
@@ -19,7 +19,7 @@ class VentaService:
         :param observacion: Texto opcional
         """
         total_venta = 0
-        estado_inicial = EstadoVenta.objects.get(id_estado_venta=3) 
+        estado_inicial = EstadoPago.objects.get(id_estado_pago=3) 
         venta = Venta.objects.create(
             cliente=cliente,
             total=0.00, # Se actualiza al final
@@ -75,10 +75,10 @@ class VentaService:
         # Asegúrate de usar los IDs correctos para tus estados
         if total_pagado < total_venta:
             # Estado Pendiente/Incompleto
-             venta.estado = EstadoVenta.objects.get(pk=1) 
+             venta.estado = EstadoPago.objects.get(pk=1) 
         else:
             # Estado Pagado/Completo
-            venta.estado = EstadoVenta.objects.get(pk=2)
+            venta.estado = EstadoPago.objects.get(pk=2)
         
         venta.save()
         return venta
@@ -98,71 +98,71 @@ class VentaService:
         except Venta.DoesNotExist:
             raise ValidationError(f"La venta {venta_id} no existe.")
 
-    # 2. VALIDACIÓN DE MÉTODOS Y MONEDAS (Evita el bucle N+1)
-    metodo_ids = [dato_pago['metodo_pago_id'] for dato_pago in pagos_data]
-    moneda_ids = [dato_pago['moneda_id'] for dato_pago in pagos_data]
-    
-    # Verificamos cuántos existen de los solicitados
-    metodos_existentes = MetodoPago.objects.filter(id__in=metodo_ids)
-    monedas_existentes = Moneda.objects.filter(id__in=moneda_ids)
-
-    if metodos_existentes.count() != len(set(metodo_ids)):
-        raise ValidationError("Uno o más métodos de pago no son válidos.")
-    
-    if monedas_existentes.count() != len(set(moneda_ids)):
-        raise ValidationError("Uno o más tipos de moneda no son válidos.")
-
-    tasa_obj = TasaCambio.objects.filter(moneda='USD').first()
-    tasa_valor = tasa_obj.monto if tasa_obj else Decimal('1.00')
-
-    # Convertimos a diccionarios para acceso rápido
-    dict_metodos = {metodo.id: metodo for metodo in metodos_existentes}
-    dict_monedas = {moneda.id: moneda for moneda in monedas_existentes}
-
-    # 3. REGISTRO DE PAGOS (Bulk Create es opcional aquí, pero útil)
-    pagos_a_crear = []
-    for pago in pagos_data:
-        monto_original = Decimal(str(pago['monto']))
-        moneda = dict_monedas.get(pago['moneda_id'])
+        # 2. VALIDACIÓN DE MÉTODOS Y MONEDAS (Evita el bucle N+1)
+        metodo_ids = [dato_pago['metodo_pago_id'] for dato_pago in pagos_data]
+        moneda_ids = [dato_pago['moneda_id'] for dato_pago in pagos_data]
         
-        if not moneda:
-            raise ValidationError(f"Moneda ID {pago['moneda_id']} no válida.")
+        # Verificamos cuántos existen de los solicitados
+        metodos_existentes = MetodoPago.objects.filter(id__in=metodo_ids)
+        monedas_existentes = Moneda.objects.filter(id__in=moneda_ids)
 
-        # LÓGICA DE CONVERSIÓN:
-        # Si el pago es en Bs (suponiendo que 'VES' es el código), convertimos a USD
-        if moneda.codigo == 'VES':
-            monto_en_usd = monto_original / tasa_valor
+        if metodos_existentes.count() != len(set(metodo_ids)):
+            raise ValidationError("Uno o más métodos de pago no son válidos.")
+        
+        if monedas_existentes.count() != len(set(moneda_ids)):
+            raise ValidationError("Uno o más tipos de moneda no son válidos.")
+
+        tasa_obj = TasaCambio.objects.filter(moneda='USD').first()
+        tasa_valor = tasa_obj.monto if tasa_obj else Decimal('1.00')
+
+        # Convertimos a diccionarios para acceso rápido
+        dict_metodos = {metodo.id: metodo for metodo in metodos_existentes}
+        dict_monedas = {moneda.id: moneda for moneda in monedas_existentes}
+
+        # 3. REGISTRO DE PAGOS (Bulk Create es opcional aquí, pero útil)
+        pagos_a_crear = []
+        for pago in pagos_data:
+            monto_original = Decimal(str(pago['monto']))
+            moneda = dict_monedas.get(pago['moneda_id'])
+            
+            if not moneda:
+                raise ValidationError(f"Moneda ID {pago['moneda_id']} no válida.")
+
+            # LÓGICA DE CONVERSIÓN:
+            # Si el pago es en Bs (suponiendo que 'VES' es el código), convertimos a USD
+            if moneda.codigo == 'VES':
+                monto_en_usd = monto_original / tasa_valor
+            else:
+                monto_en_usd = monto_original
+            
+            pagos_a_crear.append(PagoVenta(
+                venta=venta,
+                monto=monto_en_usd,
+                metodo_pago=dict_metodos[pago['metodo_pago_id']],
+                moneda=dict_monedas[pago['moneda_id']]
+            ))
+        
+        PagoVenta.objects.bulk_create(pagos_a_crear)
+
+        # 4. CÁLCULO OPTIMIZADO DEL TOTAL
+        # Dejamos que la base de datos haga la suma, es mucho más rápido
+        resultado = venta.pagoventa_set.aggregate(total_acumulado=Sum('monto'))
+        total_acumulado = resultado['total_acumulado'] or Decimal('0.00')
+
+        # 5. ACTUALIZACIÓN DE ESTADO (Usando constantes o IDs fijos)
+        ID_PAGADA = 2
+        ID_PENDIENTE = 1
+        
+        # Margen de error pequeño por decimales (0.01)
+        if total_acumulado >= (venta.total - Decimal('0.01')):
+            nuevo_estado_id = ID_PAGADA
         else:
-            monto_en_usd = monto_original
-        
-        pagos_a_crear.append(PagoVenta(
-            venta=venta,
-            monto=monto_en_usd,
-            metodo_pago=dict_metodos[pago['metodo_pago_id']],
-            moneda=dict_monedas[pago['moneda_id']]
-        ))
-    
-    PagoVenta.objects.bulk_create(pagos_a_crear)
-
-    # 4. CÁLCULO OPTIMIZADO DEL TOTAL
-    # Dejamos que la base de datos haga la suma, es mucho más rápido
-    resultado = venta.pagoventa_set.aggregate(total_acumulado=Sum('monto'))
-    total_acumulado = resultado['total_acumulado'] or Decimal('0.00')
-
-    # 5. ACTUALIZACIÓN DE ESTADO (Usando constantes o IDs fijos)
-    ID_PAGADA = 2
-    ID_PENDIENTE = 1
-    
-    # Margen de error pequeño por decimales (0.01)
-    if total_acumulado >= (venta.total - Decimal('0.01')):
-        nuevo_estado_id = ID_PAGADA
-    else:
-        nuevo_estado_id = ID_PENDIENTE
-         
-    if venta.estado_id != nuevo_estado_id:
-        venta.estado_id = nuevo_estado_id
-        venta.save(update_fields=['estado']) # Solo actualizamos el campo estado por eficiencia
-                
+            nuevo_estado_id = ID_PENDIENTE
+            
+        if venta.estado_id != nuevo_estado_id:
+            venta.estado_id = nuevo_estado_id
+            venta.save(update_fields=['estado']) # Solo actualizamos el campo estado por eficiencia
+                    
         return venta
 
     @staticmethod

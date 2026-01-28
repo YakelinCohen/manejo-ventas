@@ -3,8 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from apps.utils.decorators import validar_payload
-from apps.ventas.models import Cliente, Venta, MetodoPago, EstadoVenta
-from apps.ventas.serializers import ClienteSerializer, VentaSerializer, MetodoPagoSerializer, EstadoVentaSerializer, VentaCreateSerializer, PagoVentaSerializer
+from apps.ventas.models import Cliente, Venta, MetodoPago, EstadoPago
+from apps.ventas.serializers import ClienteSerializer, VentaSerializer, MetodoPagoSerializer, EstadoPagoSerializer, VentaCreateSerializer, PagoVentaSerializer
 from apps.ventas.services import VentaService
 
 
@@ -79,10 +79,10 @@ class MetodoPagoView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-class EstadoVentaView(APIView):
+class EstadoPagoView(APIView):
     def get(self, request):
-        estados_venta = EstadoVenta.objects.all()
-        serializer = EstadoVentaSerializer(estados_venta, many=True)
+        estados_venta = EstadoPago.objects.all()
+        serializer = EstadoPagoSerializer(estados_venta, many=True)
         return Response(serializer.data)
 
     @validar_payload
@@ -93,7 +93,7 @@ class EstadoVentaView(APIView):
             # Detectamos si es una lista para activar many=True
             es_lista = isinstance(payload, list)
             
-            validador = EstadoVentaSerializer(data=payload, many=es_lista)
+            validador = EstadoPagoSerializer(data=payload, many=es_lista)
             validador.is_valid(raise_exception=True) 
             validador.save() 
             return Response(validador.data, status=status.HTTP_201_CREATED)

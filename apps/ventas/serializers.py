@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.ventas.models import Cliente, Venta, DetalleVenta,MetodoPago, EstadoVenta, PagoVenta
+from apps.ventas.models import Cliente, Venta, DetalleVenta,MetodoPago, EstadoPago, PagoVenta
 from apps.inventario.models import Producto
 
 class ClienteSerializer(serializers.ModelSerializer):
@@ -55,9 +55,9 @@ class MetodoPagoSerializer(serializers.ModelSerializer):
         model = MetodoPago
         fields = '__all__'
 
-class EstadoVentaSerializer(serializers.ModelSerializer):
+class EstadoPagoSerializer(serializers.ModelSerializer):
     class Meta:
-        model = EstadoVenta
+        model = EstadoPago
         fields = '__all__'
 
 class PagoVentaSerializer(serializers.ModelSerializer):

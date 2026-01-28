@@ -1,5 +1,5 @@
 from apps.ventas.services import VentaService
-from apps.ventas.models import Cliente, EstadoVenta, MetodoPago, Venta
+from apps.ventas.models import Cliente, EstadoPago, MetodoPago, Venta
 from apps.configuracion.models import Moneda
 from apps.inventario.models import Producto
 
@@ -12,9 +12,9 @@ try:
     metodo, _ = MetodoPago.objects.get_or_create(pk=1, defaults={'nombre': 'Efectivo'})
     
     # Ensure statuses exist
-    pendiente, _ = EstadoVenta.objects.get_or_create(pk=1, defaults={'nombre': 'Pendiente'})
-    pagada, _ = EstadoVenta.objects.get_or_create(pk=2, defaults={'nombre': 'Pagada'})
-    EstadoVenta.objects.get_or_create(pk=3, defaults={'nombre': 'Completada'}) 
+    pendiente, _ = EstadoPago.objects.get_or_create(pk=1, defaults={'nombre': 'Pendiente'})
+    pagada, _ = EstadoPago.objects.get_or_create(pk=2, defaults={'nombre': 'Pagada'})
+    EstadoPago.objects.get_or_create(pk=3, defaults={'nombre': 'Completada'}) 
 
     # 1. Create a Sale with 0 payments initially (or partial) via Service
     # We use VentaService.crear_venta but pass empty payments to simulate "Credit" or just initial creation
